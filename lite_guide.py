@@ -50,6 +50,8 @@ def main(guide_path, out_path):
     with open(out_path, "w") as f:
         json.dump({"generated": now, "ch": out}, f, separators=(",", ":"), ensure_ascii=False)
     print(f"lite guide: {len(out)}/{len(wanted)} channels, {sum(map(len, out.values()))} programmes")
+    if len(wanted) < 50 or len(out) < 50:
+        sys.exit(f"lite guide looks broken: playlist ids {len(wanted)}, channels with programmes {len(out)}")
 
 
 if __name__ == "__main__":

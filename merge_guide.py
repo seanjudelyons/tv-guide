@@ -28,13 +28,14 @@ def fetch(url):
 
 
 def main(out_path):
-    channels, programmes = {}, []
+    channels, programmes, failed = {}, [], []
     owner = {}  # channel id -> source that supplied it, so overlapping regions don't duplicate
     for url in SOURCES:
         try:
             root = ET.fromstring(fetch(url))
         except Exception as e:  # one broken source shouldn't break the whole guide
             print(f"skip {url}: {e}", file=sys.stderr)
+            failed.append(url)
             continue
         for ch in root.findall("channel"):
             cid = ch.get("id")
@@ -50,6 +51,9 @@ def main(out_path):
     tv.extend(programmes)
     with gzip.open(out_path, "wb", compresslevel=9) as f:
         ET.ElementTree(tv).write(f, encoding="utf-8", xml_declaration=True)
+    # Fail loudly (so GitHub emails/opens an issue) rather than publish a broken guide
+    if len(programmes) < 10000 or len(failed) > len(SOURCES) // 2:
+        sys.exit(f"guide looks broken: {len(programmes)} programmes, {len(failed)} sources failed")
 
 
 if __name__ == "__main__":

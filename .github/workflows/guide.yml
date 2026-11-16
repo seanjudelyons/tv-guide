@@ -4,12 +4,18 @@ on:
   schedule:
     - cron: "17 */6 * * *"   # every 6 hours
   workflow_dispatch:
+    inputs:
+      simulate_failure:
+        description: "Fail on purpose to test the alert email"
+        type: boolean
+        default: false
   push:
     branches: [main]
 
 permissions:
   contents: write
   actions: write
+  issues: write
 
 concurrency:
   group: guide
@@ -20,6 +26,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Simulated failure (alert test only)
+        if: ${{ inputs.simulate_failure }}
+        run: exit 1
       - name: Merge guides
         run: python3 merge_guide.py /tmp/guide.xml.gz
       - name: Small JSON guide for the Samsung TV app
@@ -39,3 +48,32 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/guide.yml/enable" || true
+
+      # Alerting: a new issue emails the repo owner. One open issue at a time; closed automatically on recovery.
+      - name: Open an alert issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          open=$(gh issue list -R "${{ github.repository }}" --label tv-alert --state open --json number --jq '.[0].number')
+          gh label create tv-alert -R "${{ github.repository }}" --color d73a4a --description "TV guide build failures" 2>/dev/null || true
+          if [ -n "$open" ]; then
+            gh issue comment "$open" -R "${{ github.repository }}" --body "Still failing: $RUN_URL"
+          else
+            gh issue create -R "${{ github.repository }}" --label tv-alert \
+              --title "TV guide build failed" \
+              --body "The scheduled TV guide build failed, so the TV guide / Pluto links may go stale.
+
+          Run: $RUN_URL
+
+          See docs in the tv-project folder (OPERATIONS.md → Troubleshooting). This issue closes itself when a later run succeeds."
+          fi
+      - name: Close alert issues on success
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for n in $(gh issue list -R "${{ github.repository }}" --label tv-alert --state open --json number --jq '.[].number'); do
+            gh issue close "$n" -R "${{ github.repository }}" --comment "Recovered: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          done

@@ -44,6 +44,8 @@ def main(out_path):
     with open(out_path, "w") as f:
         json.dump({"generated": int(time.time()), "urls": urls}, f, separators=(",", ":"))
     print(f"pluto links: {len(urls)}/{len(ids)} resolved")
+    if ids and len(urls) < len(ids) // 2:
+        sys.exit(f"pluto links look broken: only {len(urls)}/{len(ids)} resolved")
 
 
 if __name__ == "__main__":
