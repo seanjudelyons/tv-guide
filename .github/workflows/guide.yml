@@ -59,11 +59,11 @@ jobs:
           open=$(gh issue list -R "${{ github.repository }}" --label tv-alert --state open --json number --jq '.[0].number')
           gh label create tv-alert -R "${{ github.repository }}" --color d73a4a --description "TV guide build failures" 2>/dev/null || true
           if [ -n "$open" ]; then
-            gh issue comment "$open" -R "${{ github.repository }}" --body "Still failing: $RUN_URL"
+            gh issue comment "$open" -R "${{ github.repository }}" --body "@${{ github.repository_owner }} still failing: $RUN_URL"
           else
             gh issue create -R "${{ github.repository }}" --label tv-alert \
               --title "TV guide build failed" \
-              --body "The scheduled TV guide build failed, so the TV guide / Pluto links may go stale.
+              --body "@${{ github.repository_owner }} the scheduled TV guide build failed, so the TV guide / Pluto links may go stale.
 
           Run: $RUN_URL
 
