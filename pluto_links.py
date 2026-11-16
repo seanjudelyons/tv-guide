@@ -1,4 +1,4 @@
-"""Resolve the playlist's Pluto TV redirect links (jmp2.uk/plu-<id>.m3u8) to Pluto's real stream address.
+"""Resolve the playlist's jmp2.uk redirect links (Pluto plu-<id>.m3u8 and Samsung TV Plus stvp-<id>) to Pluto's real stream address.
 
 The Samsung TV app can't follow those redirects itself (no CORS on the redirect), so this publishes
 pluto.json: {"generated": epoch, "urls": {channel_id: stream_url}}. Pluto's session tokens last ~24h
@@ -24,7 +24,9 @@ opener = urllib.request.build_opener(NoRedirect)
 
 
 def resolve(cid):
-    req = urllib.request.Request(f"https://jmp2.uk/plu-{cid}.m3u8", headers={"User-Agent": "Mozilla/5.0"})
+    # cid is a Pluto id, or "stvp-<id>" for a Samsung TV Plus link
+    path = cid if cid.startswith("stvp-") else f"plu-{cid}.m3u8"
+    req = urllib.request.Request(f"https://jmp2.uk/{path}", headers={"User-Agent": "Mozilla/5.0"})
     try:
         opener.open(req, timeout=30)
     except urllib.error.HTTPError as e:
@@ -39,6 +41,7 @@ def main(out_path):
     req = urllib.request.Request(f"{PLAYLIST}?t={int(time.time())}", headers={"User-Agent": "tv-pluto-links/1.0"})
     m3u = urllib.request.urlopen(req, timeout=60).read().decode("utf-8", "replace")
     ids = sorted(set(re.findall(r"jmp2\.uk/plu-([0-9a-f]{24})", m3u)))
+    ids += sorted(set(re.findall(r"jmp2\.uk/(stvp-[A-Za-z0-9]+)", m3u)))
     with ThreadPoolExecutor(8) as ex:
         urls = {cid: url for cid, url in ex.map(resolve, ids) if url}
     with open(out_path, "w") as f:
