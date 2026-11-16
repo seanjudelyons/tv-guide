@@ -36,7 +36,7 @@ def resolve(cid):
 
 
 def main(out_path):
-    req = urllib.request.Request(PLAYLIST, headers={"User-Agent": "tv-pluto-links/1.0"})
+    req = urllib.request.Request(f"{PLAYLIST}?t={int(time.time())}", headers={"User-Agent": "tv-pluto-links/1.0"})
     m3u = urllib.request.urlopen(req, timeout=60).read().decode("utf-8", "replace")
     ids = sorted(set(re.findall(r"jmp2\.uk/plu-([0-9a-f]{24})", m3u)))
     with ThreadPoolExecutor(8) as ex:

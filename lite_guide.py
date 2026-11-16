@@ -22,7 +22,7 @@ def ts(s):
 
 
 def main(guide_path, out_path):
-    req = urllib.request.Request(PLAYLIST, headers={"User-Agent": "tv-guide-lite/1.0"})
+    req = urllib.request.Request(f"{PLAYLIST}?t={int(time.time())}", headers={"User-Agent": "tv-guide-lite/1.0"})
     m3u = urllib.request.urlopen(req, timeout=60).read().decode("utf-8", "replace")
     wanted = set(re.findall(r'tvg-id="([^"]+)"', m3u))
     now = int(time.time())
