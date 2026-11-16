@@ -1,0 +1,37 @@
+name: Build TV guide
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"   # every 6 hours
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: guide
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Merge guides
+        run: python3 merge_guide.py /tmp/guide.xml.gz
+      - name: Publish to the guide branch (history overwritten each run, so the repo stays small)
+        run: |
+          mkdir /tmp/out && cp /tmp/guide.xml.gz /tmp/out/ && cd /tmp/out
+          git init -q -b guide
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add guide.xml.gz
+          git commit -q -m "Guide $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" guide
+      - name: Keep the schedule enabled (GitHub pauses idle schedules after 60 days)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/guide.yml/enable" || true
