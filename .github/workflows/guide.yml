@@ -56,11 +56,11 @@ jobs:
           else python3 pluto_links.py /tmp/pluto.json; fi
       - name: Publish to the guide branch (history overwritten each run, so the repo stays small)
         run: |
-          mkdir /tmp/out && cp /tmp/guide.xml.gz /tmp/guide.json /tmp/pluto.json /tmp/out/ && cd /tmp/out
+          mkdir /tmp/out && cp /tmp/guide.xml.gz /tmp/guide.json /tmp/pluto.json /tmp/ids.json /tmp/out/ && cd /tmp/out
           git init -q -b guide
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
-          git add guide.xml.gz guide.json pluto.json
+          git add guide.xml.gz guide.json pluto.json ids.json
           git commit -q -m "Guide $(date -u +%Y-%m-%dT%H:%MZ)"
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" guide
       - name: Keep the schedule enabled (GitHub pauses idle schedules after 60 days)
