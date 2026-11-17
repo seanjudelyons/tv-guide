@@ -2,7 +2,9 @@ name: Build TV guide
 
 on:
   schedule:
-    - cron: "17 */6 * * *"   # every 6 hours
+    # Every 30 minutes. Most runs are "quick" (re-read the two Australian sources, about 5 seconds); a "full" run
+    # (all sources + new Pluto links) happens when the last one is over 5.5 hours old. See the "Full or quick" step.
+    - cron: "7,37 * * * *"
   workflow_dispatch:
     inputs:
       simulate_failure:
@@ -29,12 +31,29 @@ jobs:
       - name: Simulated failure (alert test only)
         if: ${{ inputs.simulate_failure }}
         run: exit 1
+      - name: Full or quick run?
+        id: mode
+        env:
+          RAW: https://raw.githubusercontent.com/${{ github.repository }}/guide
+        run: |
+          # Pushes and manual runs are always full. A scheduled run is quick unless the last full run is over
+          # 5.5 hours old; pluto.json is only rewritten by full runs, so its age is the age of the last full run.
+          mode=full
+          if [ "${{ github.event_name }}" = "schedule" ] && curl -fsSL --retry 3 -o /tmp/pluto_prev.json "$RAW/pluto.json"; then
+            age=$(python3 -c "import json,time; print(int(time.time()-json.load(open('/tmp/pluto_prev.json'))['generated']))" || echo 999999)
+            if [ "$age" -lt 19800 ]; then mode=fast; fi
+            echo "last full run: ${age}s ago"
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "mode: $mode"
       - name: Merge guides
-        run: python3 merge_guide.py /tmp/guide.xml.gz
+        run: python3 merge_guide.py /tmp/guide.xml.gz ${{ steps.mode.outputs.mode == 'fast' && '--fast' || '' }}
       - name: Small JSON guide for the Samsung TV app
         run: python3 lite_guide.py /tmp/guide.xml.gz /tmp/guide.json
-      - name: Pluto TV stream links for the Samsung TV app
-        run: python3 pluto_links.py /tmp/pluto.json
+      - name: Pluto TV stream links for the Samsung TV app (quick runs keep the last full run's links)
+        run: |
+          if [ "${{ steps.mode.outputs.mode }}" = "fast" ]; then cp /tmp/pluto_prev.json /tmp/pluto.json
+          else python3 pluto_links.py /tmp/pluto.json; fi
       - name: Publish to the guide branch (history overwritten each run, so the repo stays small)
         run: |
           mkdir /tmp/out && cp /tmp/guide.xml.gz /tmp/guide.json /tmp/pluto.json /tmp/out/ && cd /tmp/out
